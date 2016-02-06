@@ -5,18 +5,112 @@ date: "5 de febrero de 2016"
 output: html_document
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+INTRODUCTION
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset.
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+Loading libraries
+
+The next libraries were used for this project:
+
 
 ```{r}
-summary(cars)
+library(caret)
+library(foreign)
+library('Hmisc')
+library(rpart)
+library(rattle)
+library(randomForest)
+
 ```
 
-You can also embed plots, for example:
+Loading data
 
-```{r, echo=FALSE}
-plot(cars)
+Data are uploaded from a csv file through the next code:
+
+
+
+```{r}
+
+training <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"), na.strings=c("NA",""," "))
+testing<- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"), na.strings=c("NA",""," "))
+
+dim(training);dim(training)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+There are a lot of columns with missings values , so we have to deal with '#DIV/0.
+
+In order to  clean our data set we have to deal with missing values and we apply the following rule:
+If the count of  NAs in a variable is equal or greater than 70% we delete that variable.
+
+```{r}
+training_v3<-training[, colSums(!is.na(training)) >= nrow(training) * 0.70]
+dim(training_v3)
+testing_v3<-testing[, colSums(!is.na(testing)) >= nrow(testing) * 0.70]
+dim(testing_v3)
+
+```
+
+
+
+Now we have reduced the number of variables . At the beginning there were 159 variables and now there are 60.
+Moreover, there are useless specific data such as timestamp,user names that should be removed from our data frame.
+```{r}
+training_v4 <- training_v3[,-(1:7)] 
+testing_v4<- testing_v3[,-(1:7)]
+
+```
+TRAINING  AND TESTING SET
+
+Now we have to divide the dataset in a training set an d testing set.
+```{r}
+inTrain <- createDataPartition(training_v4$classe, p=3/4)[[1]]
+train <- training_v4[inTrain, ]
+test <- training_v4[-inTrain, ]
+
+```
+CART  TREE ALGORITHM 
+
+The first algorithm used is the cart tree.
+
+```{r}
+mofFit<-train( train$classe~.,method="rpart",data=train)
+fancyRpartPlot(mofFit$finalModel)
+
+```
+
+
+The problem of applying this algorithm  is their low accuracy.
+```{r}
+prediccion<-predict(mofFit,newdata=test)
+confusionMatrix(prediccion, test$classe)
+
+```
+
+RANDOM FOREST  ALGORITHM AND CROSS VALIDATION
+
+
+Now the new step is applying Randon Forest to our data.
+ K-fold cross-validation is used during the training with a 3-fold .
+ 
+
+
+mod_rf<- train(classe~ .,data = train,method="rf",trControl=trainControl(method="cv",number=3))
+
+predictions_rf <- predict(mod_rf, test)
+
+confusionMatrix(predictions_rf, test$classe)$table
+
+
+ 
+
+ 
+The results with Random Forest are better. Now the accuracy is 0.99
+
+
+
